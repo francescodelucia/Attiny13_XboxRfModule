@@ -1,0 +1,60 @@
+# SERVER IN ASCOLTO SULLA PORTA 443 (SSL) pre rendere sicuro il traffico Guacamole e proxare le richieste a Tomcat7 esposto solo localmente
+server {
+	listen 80 default_server;
+	server_name _;
+	return 301 https://$host$request_uri;
+}
+
+server {
+	listen 443 ssl;
+	server_name  Brutal;
+	# configurazione SSL
+	ssl on;
+	ssl_certificate /etc/nginx/ssl/nginx.crt;
+	ssl_certificate_key  /etc/nginx/ssl/nginx.key;
+	ssl_session_cache shared:SSL:10m;
+	ssl_ciphers 'AES256+EECDH:AES256+EDH:!aNULL';
+	ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+	ssl_stapling on;
+	ssl_stapling_verify on;
+	ssl_prefer_server_ciphers on;
+	#ssl_trusted_certificate /etc/secrets/trusted
+	#   ssl_dhparam /etc/ssl/certs/dhparam.pem;
+	
+	#tuning performante (testare meglio)
+	tcp_nodelay    on;
+	tcp_nopush     off;
+	sendfile       on;
+	client_body_buffer_size 10K;
+	client_header_buffer_size 1k;
+	client_max_body_size 8m;
+	large_client_header_buffers 2 1k;
+	client_body_timeout 12;
+	client_header_timeout 12;
+	keepalive_timeout 15;
+	send_timeout 10;
+	
+	# ATTENZIONE: se vogliamo attiviamolo in fase di test
+	access_log off;
+	
+	# ATTENZIONE NON ATTIVARE MAI il proxy_buffering!; impatta troppo sulla qualita  connessione
+	proxy_buffering off;
+	proxy_redirect  off;
+	   
+	# Abilitazione dei websockets prime 3 linee
+	proxy_http_version 1.1;
+	# ATTENZIONE !!!: Qui mi perdo $http_upgrae perche viene considerata dallo script una variabile, devo controllare come scriverla perche non sia parsata
+	proxy_set_header Upgrade $http_upgrade;
+	proxy_set_header Connection "upgrade";
+		
+	# Reverse proxy per puntare al tomcat interno e precisamente alla guacamole app.
+	#proxy_cookie_path /guacamole/ /;
+	location / {
+		auth_basic "Private Property";
+        	auth_basic_user_file /etc/nginx/.htpasswd;
+		# I am running the Tomcat7 and Guacamole on the local server
+		proxy_pass http://127.0.0.1:5601/;
+		break;
+	}
+}
+	
