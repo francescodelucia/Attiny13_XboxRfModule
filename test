@@ -1,0 +1,443 @@
+#!/bin/bash
+
+current_path=$(pwd)
+
+setRepoWazhu(){
+	echo "################### setRepository Begin #####################################"
+	apt-get update
+	apt-get install curl apt-transport-https lsb-release -y
+	curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | apt-key add -
+	echo "deb https://packages.wazuh.com/3.x/apt/ stable main" | tee -a /etc/apt/sources.list.d/wazuh.list
+	apt-get update
+	echo "################### setRepository End #######################################"
+}
+
+InstWazuh(){
+	echo "################### InstWazuh Begin #########################################"
+	apt-get install wazuh-manager
+	echo "################### InstWazuh End  ##########################################"
+}
+
+InstWazuhAPI(){
+	echo "################### InstWazuhAPI Begin ######################################"
+	curl -sL https://deb.nodesource.com/setup_8.x | bash -
+	apt install nodejs -y
+	apt install wazuh-api -y 
+	echo "################### InstWazuhAPI End ########################################"
+}
+
+DisableWazuhUpdate(){
+	echo "################### DisableWazuhUpdate Begin ################################"
+	sed -i "s/^deb/#deb/" /etc/apt/sources.list.d/wazuh.list
+	apt update
+	echo "################### DisableWazuhUpdate End ##################################"
+}
+
+InstallFileBeat(){
+	echo "################### InstallFileBeat Begin ###################################"
+	curl -s https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+	echo "deb https://artifacts.elastic.co/packages/6.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-6.x.list
+	apt update
+	apt-get install filebeat=6.6.1 -y
+	curl -so /etc/filebeat/filebeat.yml https://raw.githubusercontent.com/wazuh/wazuh/3.8/extensions/filebeat/filebeat.yml
+	sed -i 's/YOUR_ELASTIC_SERVER_IP/127.0.0.1/g' /etc/filebeat/filebeat.yml
+	echo "################### InstallFileBeat end #####################################"
+}
+
+InstallFileBeatOffLine(){
+	echo "################### InstallFileBeatOffLine Begin ###################################"
+	dpkg -i  $current_path/res/filebeat-6.6.1-amd64.deb
+	echo "################### InstallFileBeatOffLine end #####################################"
+}
+
+StartService(){
+	echo "################### Start service "  $1  " Begin ##############################"
+	systemctl daemon-reload
+	systemctl enable $1
+	systemctl start $1
+	echo "################### Start service " $1 " End ################################"
+}
+
+StopService(){
+	echo "################### Start service "  $1  " Begin ##############################"
+	systemctl daemon-reload
+	systemctl enable $1
+	systemctl stop $1
+	echo "################### Start service " $1 " End ################################"
+}
+
+DisableElastichUpdate(){
+	echo "################### DisableElastichUpdate Begin #############################"
+	sed -i "s/^deb/#deb/" /etc/apt/sources.list.d/elastic-6.x.list
+	apt update
+	echo "################### DisableElastichUpdate End ###############################"
+}
+SetupJava(){
+	echo "################### SetupJava Begin #############################"
+	apt update
+	apt install openjdk-8-jre -y
+	echo "################### SetupJava End #############################"
+}
+
+SetupElastichRepo(){
+	echo "################### SetupElastichRepo Begin #############################"
+	apt-get install curl apt-transport-https -y 
+	curl -s https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+	echo "deb https://artifacts.elastic.co/packages/6.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-6.x.list
+	apt-get update
+	echo "################### SetupElastichRepo End ###############################"
+}
+SetupElastich(){
+	echo "################### SetupElastich Begin #############################"
+	apt install $current_path/res/elasticsearch=6.6.1 -y 
+	echo "################### SetupElastich End #############################"
+}
+SetupElastichOffline(){
+	echo "################### SetupElastich Begin #############################"
+	dpkg -i $current_path/res/elasticsearch-6.6.1.deb
+	echo "################### SetupElastich End #############################"
+}
+ConfigWazuhPluginElastich(){
+	echo "################### ConfigWazuhPluginElastich Begin #############################"
+	curl https://raw.githubusercontent.com/wazuh/wazuh/3.8/extensions/elasticsearch/wazuh-elastic6-template-alerts.json | curl -X PUT "http://localhost:9200/_template/wazuh" -H 'Content-Type: application/json' -d @-
+	echo "################### ConfigWazuhPluginElastich End #############################"
+}
+
+
+SetUpLogStash(){
+	echo "################### SetUpLogStash Begin #############################"
+	apt install logstash=1:6.6.1-1 -y
+	echo "################### SetUpLogStash End #############################"
+}
+
+SetUpLogStashOffline(){
+	echo "################### SetUpLogStash Begin #############################"
+	dpkg -i $current_path/res/logstash-6.6.1.deb
+	echo "################### SetUpLogStash End #############################"
+}
+
+LocaFileWazuhConfiguration(){
+	echo "################### LocaFileWazuhConfiguration Begin #############################"
+	curl -so /etc/logstash/conf.d/01-wazuh.conf https://raw.githubusercontent.com/wazuh/wazuh/3.8/extensions/logstash/01-wazuh-local.conf
+	echo "################### LocaFileWazuhConfiguration End #############################"
+}
+
+RemoteFileWazuhConfiguration(){
+	echo "################### RemoteFileWazuhConfiguration Begin #############################"
+	curl -so /etc/logstash/conf.d/01-wazuh.conf https://raw.githubusercontent.com/wazuh/wazuh/3.8/extensions/logstash/01-wazuh-remote.conf
+	echo "################### RemoteFileWazuhConfiguration End #############################"
+}
+SetupKibana(){
+	echo "################### InstKibana Begin #############################"
+	apt install kibana=6.6.1 -y
+	echo "################### InstKibana End #############################"
+}
+SetupKibanaOffline(){
+	echo "################### InstKibana Begin #############################"
+	dpkg -i $current_path/res/kibana-6.6.1-amd64.deb
+	echo "################### InstKibana End #############################"
+}
+
+InstKibanaPlugin(){
+	echo "################### InstKibanaPlugin Begin #############################"
+	sudo -u kibana NODE_OPTIONS="--max-old-space-size=3072" /usr/share/kibana/bin/kibana-plugin install https://packages.wazuh.com/wazuhapp/wazuhapp-3.8.2_6.6.1.zip
+	su -c 'NODE_OPTIONS="--max-old-space-size=3072" /usr/share/kibana/bin/kibana-plugin install https://packages.wazuh.com/wazuhapp/wazuhapp-3.8.2_6.6.1.zip' kibana
+	echo "################### InstKibanaPlugin End #############################"
+}
+
+KibanaConfigurationFile(){
+	echo "################### KibanaConfigurationFile Begin #############################"
+	sed -i 's/#server.host/server.host: "0.0.0.0" #/g' /etc/kibana/kibana.yml
+	echo "################### KibanaConfigurationFile End #############################"
+}
+
+InstKibanaPlugin(){
+        echo "################### InstKibanaPlugin Begin #############################"
+        sudo -u kibana NODE_OPTIONS="--max-old-space-size=3072" /usr/share/kibana/bin/kibana-plugin install https://packages.wazuh.com/wazuhapp/wazuhapp-3.8.2_6.6.1.zip
+        #cd $current_path
+        #/usr/bin/python2.7 -m SimpleHTTPServer 8000 &
+        #sleep 1
+        #NODE_OPTIONS="--max-old-space-size=3072" /usr/share/kibana/bin/kibana-plugin install http://127.0.0.1:8000/res/wazuhapp-3.8.2_6.6.1.zip
+        #killall /usr/bin/python2.7 2> /dev/null
+        echo "## stop kibana.service"
+		systemctl stop kibana.service
+		echo "## start kibana.service"  
+		systemctl start kibana.service
+		echo "## ok! kibana.service"  
+        echo "################### InstKibanaPlugin End #############################"
+}
+
+remKibanaPlugin(){
+        echo "################### remKibanaPlugin Begin #############################"
+        sudo rm -r /usr/share/kibana/plugins/brutal/
+        echo "################### remKibanaPlugin End #############################"
+}
+
+SetupDokerOffline(){
+        echo "################### remKibanaPlugin Begin #############################"
+        echo "->installo dipendenze per docker-ce"
+        dpkg -i $current_path/res/libltdl7_2.4.6-2_amd64.deb
+        echo "->installo docker-ce"
+        dpkg -i $current_path/res/docker-ce_18.06.3~ce~3-0~debian_amd64.deb
+        echo "->installo containerd.io"
+        dpkg -i $current_path/res/containerd.io_1.2.2-3_amd64.deb
+        echo "################### remKibanaPlugin End #############################"
+}
+SetupDockerCompose(){
+	cp $current_path/res/docker-compose /usr/local/bin/docker-compose
+	chmod +x /usr/local/bin/docker-compose
+}
+
+SetupNginix(){
+	echo "######### SetupNginix Begin ##############"
+	
+	echo "##########################################"
+	echo "# NGINX Installation and configuration   #"
+	echo "##########################################"
+	hostname=Brutal
+	# Installazione Nginx
+	apt-get install -y nginx
+	# Creo una cartella per salvare chiave e certificato
+	mkdir /etc/nginx/ssl
+	# Creazione del certificato SSL self-signed
+	openssl req -x509 -subj '/C=EU/ST=IT/L=Rome/O=IT/CN=$hostname' -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt -extensions v3_ca
+	# Aggiungo i settaggi del proxy al file di configurazione di nginx (/etc/nginx/sites-enabled/default)
+	# Riferimento: Borrowed configuration di Eric Oud Ammerveled http://sourceforge.net/p/guacamole/discussion/1110834/thread/6961d682/#aca9
+	cp $current_path/res/Ngnix_conf /etc/nginx/sites-enabled/default
+	apt install apache2-utils -y
+	echo "##########################################"
+	echo "# Inserire Password per utente brutal    #"
+	echo "##########################################"
+	htpasswd -c /etc/nginx/.htpasswd brutal
+	echo "######### SetupNginix end ################" 
+}
+
+
+SetupFirewall(){
+	echo "######### SetupFirewall Begin ##############"
+	ufw disable
+	# Permetto accessi HTTPS
+	ufw allow https
+	# Permetto accessi SSH
+	ufw allow ssh
+	#porte per Ossec
+	ufw allow 1514
+	ufw allow 1515
+	ufw allow 4505
+	ufw allow 4506
+	# Abilito Firewall
+	ufw enable
+	echo "######### SetupFirewall end ##############"
+}
+SetupWazhuAgent(){
+	echo "######### SetupWazhuAgent begin ##############"
+	apt install wazuh-agent
+	echo "######### SetupWazhuAgent end ##############"
+}
+
+deployProbe(){	
+	echo "##########################################"
+	echo "# Script Setup Probe      -- Begin --    #"
+	echo "##########################################"
+	
+	echo "################################################################################################################"
+	echo 'JETFIRE DEPLOYMENT'
+	echo "################################################################################################################"
+
+	echo 'Installing Prereqisites'
+
+	add-apt-repository universe
+	apt update -qq && apt full-upgrade -y -qq && sudo apt install netsniff-ng ifupdown ethtool apt-transport-https ca-certificates curl software-properties-common -y -qq
+	apt clean
+	#curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+	#sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
+	#sudo apt update && sudo apt install docker-ce docker-compose -y -qq
+	sudo usermod -aG docker ${USER}
+
+	echo "################################################################################################################"
+	echo 'Creating path'
+	echo "################################################################################################################"
+
+	if [ ! -d /suricata/rules ] 
+		then
+			mkdir -p /suricata/rules
+		fi
+
+	if [ ! -d /suricata/conf ] 
+		then
+			mkdir -p /suricata/conf
+		fi
+
+	if [ ! -d /suricata/log ] 
+		then
+			mkdir -p /suricata/log
+		fi
+
+	for path in $(ifconfig -a| grep ens | cut -d ":" -f 1)
+		do 
+			mkdir -p /pcap/$path/pcap
+			mkdir -p /pcap/$path/rawpcap
+			mkdir -p /pcap/$path/tar
+			mkdir -p /pcap/$path/log/bro_log 
+			mkdir -p /pcap/$path/scannedpcap
+			cd /pcap/$path/log/ && touch bro_ext.log
+			
+	done
+
+	echo "################################################################################################################"
+	echo 'Downloading standard suricata Rules'
+	echo "################################################################################################################"
+		cd /suricata
+		wget https://rules.emergingthreats.net/open/suricata-4.0/emerging.rules.tar.gz
+		tar -zxvf emerging.rules.tar.gz
+		rm -rf emerging.rules.tar.gz
+		
+	echo "################################################################################################################"
+	echo 'Standard suricata conf file'
+	echo "################################################################################################################"
+		
+		cp $current_path/res/suricata.yaml /suricata/conf/
+
+	echo "################################################################################################################"
+	echo 'Editing iface'
+	echo "################################################################################################################"
+
+		for iface in $(ifconfig -a| grep ens | cut -d ":" -f 1)
+		do
+		
+			echo -e "auto $iface" > /etc/network/interfaces.d/$iface
+			echo -e "iface $iface inet manual" >> /etc/network/interfaces.d/$iface
+			echo -e "   up ifconfig $iface -arp up" >> /etc/network/interfaces.d/$iface
+			echo -e "   up ip link set $iface promisc on" >> /etc/network/interfaces.d/$iface
+			echo -e "   down ifconfig $iface down" >> /etc/network/interfaces.d/$iface
+			echo -e "   post-up for i in rx sg tso ufo gso gro lro; do ethtool -K $iface $i off; done" >> /etc/network/interfaces.d/$iface
+		done
+
+	echo "################################################################################################################"
+	echo 'Setting permission'
+	echo "################################################################################################################"
+
+		chown -R ${USER}:${USER} /pcap
+
+	echo "################################################################################################################"
+	echo 'Creating jetfire sniff'
+	echo "################################################################################################################"
+
+		if [ ! -d /jetfire ] 
+			then
+				mkdir -p /jetfire
+		fi
+
+		cd 
+		for INTERFACE in $(ifconfig -a| grep ens | cut -d ":" -f 1)
+		do
+			cp $current_path/res/spawn_INTERFACE.sh /jetfire/spawn_$INTERFACE.sh
+			sed -i s/INTERFACE/$INTERFACE/g /jetfire/spawn_$INTERFACE.sh
+			sudo echo "#*/1 * * * * root /jetfire/spawn_$INTERFACE.sh" >> /etc/crontab
+		done
+		cd /usr/sbin
+		for i in $(ifconfig -a| grep ens | cut -d ":" -f 1)
+		do
+			cp netsniff-ng $i
+			sed -i s#SNIFFTOOL#/usr/sbin/$i#g /jetfire/spawn_$i.sh
+		done
+
+	echo "################################################################################################################"
+	echo "Uploading container"
+	echo "################################################################################################################"
+
+
+		sudo docker load -i $current_path/res/jetfiresuricata
+
+	echo "################################################################################################################"
+	echo "Creating Docker Compose File"
+	echo "################################################################################################################"
+
+    cd /jetfire
+    touch Docker-compose.yml
+    echo -e "version: '3'" >> Docker-compose.yml
+    echo -e "" >> Docker-compose.yml
+    echo -e "services:" >> Docker-compose.yml
+    for NET in $(ifconfig -a| grep ens | cut -d ":" -f 1)
+    do
+        echo -e "  $NET:" >> Docker-compose.yml
+        echo -e "    container_name: jetfire_suricata_$NET" >> Docker-compose.yml
+        echo -e "    image: jetfire/suricata" >> Docker-compose.yml
+        echo -e "    restart: unless-stopped" >> Docker-compose.yml
+        echo -e "    volumes:" >> Docker-compose.yml
+        echo -e "      - /pcap/$NET:/pcap/" >> Docker-compose.yml
+        echo -e "      - /suricata:/suricata" >> Docker-compose.yml
+    done
+
+	echo "##########################################"
+	echo "# Script Setup Probe      --   End  --   #"
+	echo "##########################################"
+}
+
+setHostName(){
+	echo "##########################################"
+	echo "# Set Host Name" $1  " -- Begin --  "  
+	echo "##########################################"
+	hostnamectl set-hostname $1
+	echo "##########################################"
+	echo "# Set Host Name" $1  " -- End --  "
+	echo "##########################################"
+}
+
+setupSaltMaster(){
+	echo "##########################################"
+	echo "# Install Salt-master     -- Begin --    #"
+	echo "##########################################"
+	apt update 
+    apt install salt-api salt-cloud salt-master salt-minion salt-ssh salt-syndic -y
+	echo "##########################################"
+	echo "# Install Salt-master     --  End  --    #"
+	echo "##########################################"
+}
+
+main(){
+ if [ "$(id -u)" != "0" ]; then
+	echo "Sorry, you are not root."
+	exit 1
+ fi	
+ setHostName traffic_capture_vm
+ setRepoWazhu
+ #SetupWazhuAgent
+ InstWazuh
+ StartService  wazuh-manager
+ InstWazuhAPI
+ StartService wazuh-api
+ #DisableWazuhUpdate
+ #InstallFileBeat
+ #InstallFileBeatOffLine
+ #StartService filebeat.service
+ SetupJava
+ SetupElastichRepo
+ #SetupElastich
+ SetupElastichOffline
+ StartService elasticsearch.service
+ #SetUpLogStash    
+ SetUpLogStashOffline
+ LocaFileWazuhConfiguration
+ StartService logstash.service
+ #SetupKibana
+ #SetupKibanaOffline
+ ConfigWazuhPluginElastich
+ #KibanaConfigurationFile
+ #StartService kibana.service
+ #DisableElastichUpdate
+ #remKibanaPlugin
+ #InstKibanaPlugin
+ SetupDokerOffline
+ SetupDockerCompose
+ #SetupNginix
+ #StartService nginx.service
+ #SetupFirewall
+ setupSaltMaster
+ #StopService kibana.service
+ #StopService nginx.service
+ #deployProbe
+}
+
+
+main
